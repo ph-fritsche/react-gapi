@@ -1,0 +1,25 @@
+import { useContext, useEffect, useRef, useState } from 'react'
+import { GoogleApiContext } from './GoogleApiContext'
+
+export function useGoogleApi({discoveryDocs = [], scopes = [], modules = []} = {}) {
+    const { gapi, configure } = useContext(GoogleApiContext) ?? {}
+
+    const [configureState, setConfigureState] = useState()
+
+    const mounted = useRef()
+    useEffect(() => {
+        mounted.current = true
+        return () => { mounted.current = false}
+    })
+
+    const [, rerender] = useState()
+    const auth = gapi?.auth2?.getAuthInstance()
+    useEffect(() => {
+        if (auth) {
+            auth.isSignedIn.listen(() => mounted.current && rerender({}))
+            auth.currentUser.listen(() => mounted.current && rerender({}))
+        }
+    }, [auth])
+
+    return configure ? configure({discoveryDocs, scopes, modules}, newState => mounted.current && newState !== configureState && setConfigureState(newState)) : undefined
+}
