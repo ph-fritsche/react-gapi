@@ -39,6 +39,7 @@ export function MyAuthComponent() {
         ? `Logged in as "${auth.currentUser.get().getBasicProfile().getName()"`
         : <button onClick={() => auth.signIn()}>Login</button>
   }</div>
+}
 ```
 ```js
 // src/MyDriveComponent.js
