@@ -4478,6 +4478,11 @@ react-is@^17.0.1:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-17.0.1.tgz#5b3531bd76a645a4c9fb6e693ed36419e3301339"
   integrity sha512-NAnt2iGDXohE5LI7uBnLnqvLQMtzhkiAOLXTmv+qnF9Ky7xAPcX8Up/xWIhxvLVGJvuLiNc4xQLtuqDRzb4fSA==
 
+react-weblibrary@^0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/react-weblibrary/-/react-weblibrary-0.1.0.tgz#31168ce02b91f158f6247fb9abab712c47e82d6b"
+  integrity sha512-uCrGw7bTa+L+IdHyaIuyoGwvWsunRdNrIiX3oE7Ogd6s/A7N2pOx4dmDQCDF9AQtWyU5BmrFHrgq6gvM7bAVew==
+
 react@^17.0.1:
   version "17.0.1"
   resolved "https://registry.yarnpkg.com/react/-/react-17.0.1.tgz#6e0600416bd57574e3f86d92edba3d9008726127"

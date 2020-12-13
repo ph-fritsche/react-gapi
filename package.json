@@ -1,12 +1,18 @@
 {
     "name": "react-gapi",
     "description": "Google API per React hook",
-    "keywords": ["Google", "API", "googleapis"],
+    "keywords": [
+        "Google",
+        "API",
+        "googleapis"
+    ],
     "main": "dist/index.js",
     "files": [
         "dist/"
     ],
-    "dependencies": {},
+    "dependencies": {
+        "react-weblibrary": "^0.1.0"
+    },
     "peerDependencies": {
         "react": ">=16.8"
     },
