@@ -41,7 +41,7 @@ export function GoogleApiProvider({clientId, children}) {
     function init(options, state) {
         const { scopes, discoveryDocs } = options
 
-        const auth = gapi.auth2.getAuthInstance()
+        const auth = gapi.auth2?.getAuthInstance()
 
         const missingScopes = (() => {
             if (!scopes.length || !auth) {
