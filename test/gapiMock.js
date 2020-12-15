@@ -1,5 +1,5 @@
 import { waitFor } from '@testing-library/react'
-import { createGapiMock } from './_gapiMock'
+import { createGapiMock } from '../src/gapiMock'
 
 function loadAndInit(gapi, module, initConf) {
     return new Promise((res, rej) => {
