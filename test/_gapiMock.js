@@ -1,21 +1,46 @@
 export function createGapiMock() {
     const gapi = {}
 
+    let nextInteraction
     const _user = {
-        id: undefined,
         isSignedIn: false,
         scopes: [],
+        props: {
+            id: undefined,
+            name: '',
+            givenName: '',
+            familyName: '',
+            imageUrl: '',
+            email: '',
+        },
+        resolveNextInteraction: () => {
+            if (typeof(nextInteraction) === 'function') {
+                nextInteraction()
+                nextInteraction = undefined
+            } else if (!nextInteraction) {
+                nextInteraction = Promise.resolve()
+            }
+        },
     }
     const user = {
-        isSignedIn: (scopes = [], id = Math.random().toString(10).substr(2, 10)) => {
-            _user.id = id
+        isSignedIn: (scopes = [], userProps) => {
             _user.isSignedIn = true,
             _user.scopes = scopes
+            _user.props = {..._user.props, ...userProps, id: userProps ?? _user.props ?? mockId() }
         },
-        isNotSignedIn: () => {
-            _user.id = undefined
+        isNotSignedIn: (scopes = [], userProps) => {
             _user.isSignedIn = false,
-            _user.scopes = []
+            _user.scopes = scopes
+            _user.props = { ..._user.props, ...userProps }
+        },
+        nextInteraction: () => {
+            if (!nextInteraction) {
+                return new Promise(res => { nextInteraction = res })
+            } else if (nextInteraction instanceof Promise) {
+                const p = nextInteraction
+                nextInteraction = undefined
+                return p
+            }
         },
     }
 
@@ -45,6 +70,10 @@ const createGapiModuleMocks = {
     },
 }
 
+function mockId() {
+    return Math.random().toString(10).substr(2, 10)
+}
+
 function notImplemented(descr) {
     throw `${descr} is not implemented yet.`
 }
@@ -57,16 +86,29 @@ function createAuthModuleMock({user, _user}) {
     let currentUserListeners = []
 
     const auth2 = {
-        init: ({ client_id, scope }) => {
-            if (!initConfig) {
-                initConfig = { client_id }
+        init: ({ client_id, fetch_basic_profile = true, scope}) => {
+            if (!client_id) {
+                throw { message: `Missing required parameter 'client_id'`}
             }
 
-            authInstance = createAuthInstanceMock()
+            if (fetch_basic_profile) {
+                scope = (scope ?? '') + ' openid email profile'
+            } else if (!scope) {
+                throw { message: `Missing required parameter 'scope'`}
+            }
 
-            return requestScopes(scope.split(' ').filter(k => Boolean(k)))
+            if (!initConfig) {
+                initConfig = {client_id, fetch_basic_profile, scope}
+            }
+            if (!authInstance) {
+                authInstance = createAuthInstanceMock({scope})
+            }
+
+            return requestScopes((scope ?? '').split(' ').filter(k => Boolean(k)), 'auth')
         },
         getAuthInstance: () => authInstance,
+        authorize: () => notImplemented('auth2.authorize'),
+        enableDebugLogs: () => notImplemented('auth2.enableDebugLogs'),
     }
 
     function notifyListeners(isSignedInChanged) {
@@ -76,64 +118,72 @@ function createAuthModuleMock({user, _user}) {
         currentUserListeners.forEach(c => c(currentUser))
     }
 
-    function requestScopes(scopes = [], authOrUser = 'auth') {
-        if (!initConfig.client_id) {
-            throw 'client_id has to be defined before requesting scopes'
-        }
+    function requestScopes(scopes = [], authOrUser = 'user') {
         if (_user.promise) {
             throw 'The behavior when a previous Promise is still pending is not known - call user.grantsScopes() or user.closesPopup()'
         }
         return _user.promise = new Promise((res, rej) => {
-            user.grantsScopes = (grantedScopes) => {
+            function clearInteraction() {
+                delete user.grantsScopes
+                delete user.closesPopup
+                Promise.resolve().then(() => { delete _user.promise })
+            }
+
+            user.grantsScopes = (grantedScopes = true) => {
                 const isSignedInChanged = !_user.isSignedIn
 
-                user.isSignedIn(_user.scopes.concat(grantedScopes.filter(k => !_user.scopes.includes(k))), _user.id)
+                _user.props.id = _user.props.id ?? mockId()
+                _user.isSignedIn = true
+                _user.scopes = _user.scopes.concat((grantedScopes === true ? scopes : grantedScopes).filter(k => !_user.scopes.includes(k)))
+
                 currentUser = createCurrentUserMock()
 
                 notifyListeners(isSignedInChanged)
 
-                delete user.grantsScopes
-                delete user.closesPopup
-
-                res(authOrUser === 'auth' ? auth2.getAuthInstance() : auth2.getAuthInstance().currentUser.get())
-                delete _user.promise
+                clearInteraction()
+                res(authOrUser === 'auth' ? authInstance : currentUser)
             }
             user.closesPopup = () => {
-                delete user.grantsScopes
-                delete user.closesPopup
-
+                clearInteraction()
                 rej({error: 'popup_closed_by_user'})
-                delete _user.promise
             }
 
-            // if a user granted scopes before, the popup closes automatically
-            if (_user.loggedIn && scopes.every(k => _user.scopes.includes(k))) {
-                user.grantsScopes()
+            if (authOrUser === 'user') {
+                // if a user granted scopes before, the popup closes automatically
+                if (_user.loggedIn && scopes.every(k => _user.scopes.includes(k))) {
+                    user.grantsScopes()
+                }
+
+                _user.resolveNextInteraction()
+            } else if (authOrUser === 'auth') {
+                if (_user.isSignedIn) {
+                    currentUser = createCurrentUserMock()
+                    notifyListeners(true)
+                }
+
+                clearInteraction()
+                res(authInstance)
             }
         })
     }
 
-    function createAuthInstanceMock() {
-        const signIn = ({ scope }) => requestScopes(scope.split(' ').filter(k => Boolean(k)), 'user')
-        const signOut = () => new Promise(res => {
-            const isSignedInChanged = _user.isSignedIn
-
-            _user.isSignedIn = false
-            currentUser = createCurrentUserMock()
-
-            notifyListeners(isSignedInChanged)
-
-            res(auth2.getAuthInstance().currentUser.get())
-        })
-        const disconnect = () => new Promise(res => {
-            _user.scopes = []
-            signOut.then(r => res(r))
-        })
-
+    function createAuthInstanceMock({scope}) {
         return {
-            signIn,
-            signOut,
-            disconnect,
+            signIn: (config = {}) => requestScopes((config.scope ?? scope).split(' ').filter(k => Boolean(k)), 'user'),
+            signOut: () => new Promise(res => {
+                const isSignedInChanged = _user.isSignedIn
+
+                _user.isSignedIn = false
+                currentUser = createCurrentUserMock()
+
+                notifyListeners(isSignedInChanged)
+
+                res(auth2.getAuthInstance().currentUser.get())
+            }),
+            disconnect: () => new Promise(res => {
+                _user.scopes = []
+                authInstance.signOut.then(r => res(r))
+            }),
             currentUser: {
                 get: () => currentUser,
                 listen: (c) => { currentUserListeners.push(c) },
@@ -148,12 +198,17 @@ function createAuthModuleMock({user, _user}) {
     }
 
     function createCurrentUserMock() {
+        const basicProfile = createBasicProfileMock()
+
         return {
-            getId: () => _user.id,
+            getId: () => _user.props.id,
             isSignedIn: () => _user.isSignedIn,
             getHostedDomain: () => notImplemented('GoogleUser.getHostedDomain'),
-            getGrantedScopes: () => _user.scopes.join(' '),
-            getBasicProfile: createBasicProfileMock(),
+            getGrantedScopes: () => _user.isSignedIn
+                // when fetch_basic_profile is true, the user can not login without consenting to these scopes
+                ? _user.scopes.concat(initConfig.fetch_basic_profile ? ['email', 'openid', 'profile'] : []).join(' ')
+                : '',
+            getBasicProfile: () => basicProfile,
             getAuthResponse: () => notImplemented('GoogleUser.getAuthResponse'),
             reloadAuthResponse: () => notImplemented('GoogleUser.reloadAuthResponse'),
             hasGrantedScopes: scope => String(scope).split(' ').filter(k => Boolean(k) && !_user.scopes.includes(k)).length > 0,
@@ -164,14 +219,23 @@ function createAuthModuleMock({user, _user}) {
     }
 
     function createBasicProfileMock() {
-        return {
-            getId: () => _user.id,
-            getName: () => '',
-            getGivenName: () => '',
-            getFamilyName: () => '',
-            getImageUrl: () => '',
-            getEmail: () => '',
-        }
+        return initConfig.fetch_basic_profile
+            ? {
+                getId: () => _user.props.id,
+                getName: () => _user.props.name ?? '',
+                getGivenName: () => _user.props.givenName ?? '',
+                getFamilyName: () => _user.props.familyName ?? '',
+                getImageUrl: () => _user.props.imageUrl ?? '',
+                getEmail: () => _user.props.email ?? '',
+            }
+            : {
+                getId: () => _user.props.id,
+                getName: () => '',
+                getGivenName: () => '',
+                getFamilyName: () => '',
+                getImageUrl: () => '',
+                getEmail: () => '',
+            }
     }
 
     return auth2

@@ -18,6 +18,6 @@ module.exports = {
     transformIgnorePatterns: [
     ],
     setupFilesAfterEnv: [
-        // "<rootDir>/test/_setup.js",
+        '<rootDir>/test/_setup.js',
     ],
 }
