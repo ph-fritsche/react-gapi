@@ -23,10 +23,10 @@ export function createGapiMock(setWindowProp = 'gapi') {
         },
     }
     const user = {
-        isSignedIn: (scopes = [], userProps) => {
+        isSignedIn: (scopes = [], userProps = {}) => {
             _user.isSignedIn = true,
             _user.scopes = scopes
-            _user.props = {..._user.props, ...userProps, id: userProps ?? _user.props ?? mockId() }
+            _user.props = {..._user.props, ...userProps, id: userProps.id ?? _user.props.id ?? mockId() }
         },
         isNotSignedIn: (scopes = [], userProps) => {
             _user.isSignedIn = false,
@@ -136,7 +136,7 @@ function createAuthModuleMock({user, _user}) {
                 Promise.resolve().then(() => { delete _user.promise })
             }
 
-            user.grantsScopes = (grantedScopes = true) => {
+            user.grantsScopes = (grantedScopes = true, userProps = {}) => {
                 const isSignedInChanged = !_user.isSignedIn
                 _user.isSignedIn = true
 
@@ -158,7 +158,7 @@ function createAuthModuleMock({user, _user}) {
                     }
                 })
 
-                _user.props.id = _user.props.id ?? mockId()
+                _user.props = { ..._user.props, ...userProps, id: userProps?.id ?? _user.props.id ?? mockId() }
 
                 currentUser = createCurrentUserMock()
 

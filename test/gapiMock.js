@@ -25,6 +25,14 @@ function loadAndInitAuth2(gapi, initConf) {
     })
 }
 
+const johnDoe = {
+    name: 'John Doe',
+    givenName: 'John',
+    familyName: 'Doe',
+    email: 'john.doe@example.com',
+    imageUrl: 'https://example.com/john-doe.png',
+}
+
 it('Load auth2 module', async () => {
     const { gapi } = createGapiMock()
 
@@ -42,7 +50,7 @@ it('Load auth2 module', async () => {
 it('Init with signedIn user (fetch_basic_profile=false)', async () => {
     const { gapi, user } = createGapiMock()
 
-    user.isSignedIn(['bar', 'baz'])
+    user.isSignedIn(['bar', 'baz'], johnDoe)
 
     const { auth } = await loadAndInitAuth2(gapi, {
         client_id: 'foo',
@@ -53,12 +61,14 @@ it('Init with signedIn user (fetch_basic_profile=false)', async () => {
     expect(auth).toBe(gapi.auth2.getAuthInstance())
     expect(auth.isSignedIn.get()).toBeTruthy()
     expect(auth.currentUser.get().getGrantedScopes()).toBe('bar baz')
+
+    expect(auth.currentUser.get().getBasicProfile().getName()).toBe('')
 })
 
 it('Init with signedIn user (fetch_basic_profile=true)', async () => {
     const { gapi, user } = createGapiMock()
 
-    user.isSignedIn()
+    user.isSignedIn([], johnDoe)
 
     const { auth } = await loadAndInitAuth2(gapi, {
         client_id: 'foo',
@@ -70,6 +80,12 @@ it('Init with signedIn user (fetch_basic_profile=true)', async () => {
     expect(auth.currentUser.get().getGrantedScopes()).toMatch(/(^| )email( |$)/)
     expect(auth.currentUser.get().getGrantedScopes()).toMatch(/(^| )openid( |$)/)
     expect(auth.currentUser.get().getGrantedScopes()).toMatch(/(^| )profile( |$)/)
+
+    expect(auth.currentUser.get().getBasicProfile().getName()).toBe('John Doe')
+    expect(auth.currentUser.get().getBasicProfile().getGivenName()).toBe('John')
+    expect(auth.currentUser.get().getBasicProfile().getFamilyName()).toBe('Doe')
+    expect(auth.currentUser.get().getBasicProfile().getEmail()).toBe('john.doe@example.com')
+    expect(auth.currentUser.get().getBasicProfile().getImageUrl()).toBe('https://example.com/john-doe.png')
 })
 
 it('Sign in', async () => {
@@ -85,7 +101,7 @@ it('Sign in', async () => {
 
     const signIn = gapi.auth2.getAuthInstance().signIn()
 
-    user.grantsScopes()
+    user.grantsScopes(true)
 
     const currentUser = await signIn
     expect(currentUser).toBe(gapi.auth2.getAuthInstance().currentUser.get())
@@ -94,6 +110,25 @@ it('Sign in', async () => {
 
     expect(signedInListener).toBeCalledWith(true)
     expect(currentUserListener).toBeCalledWith(currentUser)
+})
+
+it('Set basic profile infos per user.grantsScopes', async () => {
+    const { gapi, user } = createGapiMock()
+
+    const { auth } = await loadAndInitAuth2(gapi, {
+        client_id: 'foo',
+    })
+    const signIn = gapi.auth2.getAuthInstance().signIn()
+
+    user.grantsScopes(true, johnDoe)
+
+    await signIn
+
+    expect(auth.currentUser.get().getBasicProfile().getName()).toBe('John Doe')
+    expect(auth.currentUser.get().getBasicProfile().getGivenName()).toBe('John')
+    expect(auth.currentUser.get().getBasicProfile().getFamilyName()).toBe('Doe')
+    expect(auth.currentUser.get().getBasicProfile().getEmail()).toBe('john.doe@example.com')
+    expect(auth.currentUser.get().getBasicProfile().getImageUrl()).toBe('https://example.com/john-doe.png')
 })
 
 it('Sign in with some of the scopes', async () => {
