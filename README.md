@@ -1,4 +1,4 @@
-# react-googleapi
+# react-gapi
 
 Provides the configured `gapi` library from https://apis.google.com/js/api.js per react hook.
 
@@ -67,20 +67,31 @@ export function MyDriveComponent() {
 
 ```js
 // src/MyAuthComponent.test.js
-import { MyAuthComponent } from './MyAuthComponent'
-import { render, screen } from '@testing-library/react'
-import { click } from '@testing-library/user-event'
-import { GoogleApiProvider, createGapiMock } from 'react-gapi'
+import React from 'react';
+import { MyAuthComponent } from './MyAuthComponent';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom';
+import { GoogleApiProvider, createGapiMock } from 'react-gapi';
 
 it('Sign in', async () => {
-  const { gapi, user } = createGapiMock()
+    const { user } = createGapiMock();
 
-  render(<GoogleApiProvider clientId="foo"><MyAuthComponent/></GoogleApiProvider>)
+    render(
+        <GoogleApiProvider clientId="foo">
+            <MyAuthComponent />
+        </GoogleApiProvider>,
+    );
 
-  await waitFor(() => click(screen.getByRole('button', { name:/Login/i })))
+    const loginButton = await screen.findByRole('button', { name: /login/i });
+    userEvent.click(loginButton);
 
-  user.grantsScopes(, {name: 'John Doe'})
+    await act(async () => {
+        user.grantsScopes(true, { name: 'John Doe' });
 
-  await waitFor(() => screen.getByText(/Logged in as "John Doe"/))
-})
+        await screen.findByText(/Logged in as /);
+    });
+
+    expect(screen.getByText(/Logged in as /)).toHaveTextContent('"John Doe"');
+});
 ```
