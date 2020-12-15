@@ -1,10 +1,10 @@
 import React, { useMemo, useRef } from 'react'
 import PropTypes from 'prop-types'
-import { useLibray } from 'react-weblibrary'
+import { useLibrary } from 'react-weblibrary'
 import { GoogleApiContext } from './GoogleApiContext'
 
 export function GoogleApiProvider({clientId, children}) {
-    const [gapi] = useLibray('gapi', 'https://apis.google.com/js/api.js')
+    const [gapi] = useLibrary('gapi', 'https://apis.google.com/js/api.js')
 
     const requested = useRef({modules: [], discoveryDocs: [], scopes: []}).current
     const loading = useRef({modules: [], discoveryDocs: [], scopes: []}).current
