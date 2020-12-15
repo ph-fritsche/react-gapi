@@ -2,9 +2,11 @@ import React, { useContext } from 'react'
 import { act, render, waitFor } from '@testing-library/react'
 import { GoogleApiContext } from '../src/GoogleApiContext'
 import { GoogleApiProvider } from '../src/GoogleApiProvider'
-import { createGapiMock } from './_gapiMock'
+import { createGapiMock } from '../src/gapiMock'
 
-async function renderGoogleApiProvider() {
+async function renderGoogleApiProvider(mockGapi = true) {
+    const mock = mockGapi ? createGapiMock() : undefined
+
     const context = {}
     function TestComponent() {
         context.current = useContext(GoogleApiContext)
@@ -16,10 +18,14 @@ async function renderGoogleApiProvider() {
     await act(async () => {
         await waitFor(() => expect(context.current.gapi).toBeTruthy())
     })
+    expect(context.current.gapi).toBe(window.gapi)
 
     return {
+        ...mock,
         ...result,
         context,
+        gapi: context.current.gapi,
+        configure: (...a) => context.current.configure(...a),
     }
 }
 
@@ -30,51 +36,56 @@ beforeEach(() => {
 it('Provide window.gapi', async () => {
     window.gapi = {}
 
-    const { context } = await renderGoogleApiProvider()
+    const { context } = await renderGoogleApiProvider(false)
 
     expect(context.current.gapi).toBe(window.gapi)
-    expect(typeof(context.current.configure)).toBe('function')
+    expect(context.current.configure).toBeType('function')
 })
 
 it('Provide gapi from remote', async () => {
-    const { context } = await renderGoogleApiProvider()
+    const { context } = await renderGoogleApiProvider(false)
 
-    expect(typeof(context.current.gapi?.load)).toBe('function')
-    expect(typeof (context.current.configure)).toBe('function')
+    expect(context.current.gapi?.load).toBeType('function')
+    expect(context.current.configure).toBeType('function')
 })
 
 it('Load gapi modules', async () => {
-    createGapiMock()
-    const { context } = await renderGoogleApiProvider()
-
-    context.current.configure({modules: ['auth2', 'client']}, () => {})
-
-    await waitFor(() => {
-        expect(typeof(context.current.gapi?.auth2?.init)).toBe('function')
-        expect(typeof(context.current.gapi?.client?.init)).toBe('function')
-    })
-})
-
-it('Request scope', async () => {
-    const { user } = createGapiMock()
-    const { context } = await renderGoogleApiProvider()
+    const { gapi, configure } = await renderGoogleApiProvider()
 
     const setState = jest.fn()
 
-    expect(context.current.configure({scopes: ['foo', 'bar']}, setState)).toBe(undefined)
-
-    await waitFor(() => expect(typeof(user.grantsScopes)).toBe('function'))
-
-    user.grantsScopes(['foo', 'bar'])
+    expect(configure({modules: ['auth2', 'client']}, setState)).toBe(undefined)
 
     await waitFor(() => expect(setState).toBeCalled())
 
-    expect(context.current.configure({scopes: ['foo', 'bar'] }, setState)).toBeTruthy()
+    expect(configure({ modules: ['auth2', 'client'] }, setState)).toBe(gapi)
+
+    expect(gapi?.auth2?.init).toBeType('function')
+    expect(gapi?.client?.init).toBeType('function')
+})
+
+it('Request scope and signIn', async () => {
+    const { gapi, configure, user } = await renderGoogleApiProvider()
+
+    const setState = jest.fn()
+
+    expect(configure({scopes: ['foo', 'bar']}, setState)).toBe(undefined)
+
+    await waitFor(() => expect(setState).toBeCalled())
+
+    expect(configure({ scopes: ['foo', 'bar'] }, setState)).toBe(gapi)
+    expect(gapi.auth2.getAuthInstance().isSignedIn.get()).toBe(false)
+
+    gapi.auth2.getAuthInstance().signIn()
+
+    user.grantsScopes()
+
+    await waitFor(() => expect(setState).toBeCalledTimes(2))
+    expect(gapi.auth2.getAuthInstance().isSignedIn.get()).toBe(true)
 })
 
 it('Request discoveryDocs', async () => {
-    const { registerDiscoveryDocs } = createGapiMock()
-    const { context } = await renderGoogleApiProvider()
+    const { gapi, registerDiscoveryDocs, configure } = await renderGoogleApiProvider()
 
     registerDiscoveryDocs({
         foo: g => g.client.foo = {},
@@ -82,10 +93,10 @@ it('Request discoveryDocs', async () => {
     })
     const setState = jest.fn()
 
-    expect(context.current.configure({discoveryDocs: ['foo', 'bar']}, setState)).toBe(undefined)
+    expect(configure({discoveryDocs: ['foo', 'bar']}, setState)).toBe(undefined)
 
     await waitFor(() => expect(setState).toBeCalled())
 
-    expect(context.current.gapi.client.foo).toBeTruthy()
-    expect(context.current.gapi.client.bar).toBeTruthy()
+    expect(gapi.client.foo).toBeTruthy()
+    expect(gapi.client.bar).toBeTruthy()
 })
