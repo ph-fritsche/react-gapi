@@ -36,7 +36,7 @@ export function MyAuthComponent() {
     !auth
       ? <span>Loading...</span>
       : auth?.isSignedIn.get()
-        ? `Logged in as "${auth.currentUser.get().getBasicProfile().getName()"`
+        ? `Logged in as "${auth.currentUser.get().getBasicProfile().getName()}"`
         : <button onClick={() => auth.signIn()}>Login</button>
   }</div>
 }
@@ -61,4 +61,26 @@ export function MyDriveComponent() {
 
   // access the Drive API per gapi.client.drive
 }
+```
+
+## Testing
+
+```js
+// src/MyAuthComponent.test.js
+import { MyAuthComponent } from './MyAuthComponent'
+import { render, screen } from '@testing-library/react'
+import { click } from '@testing-library/user-event'
+import { GoogleApiProvider, createGapiMock } from 'react-gapi'
+
+it('Sign in', async () => {
+  const { gapi, user } = createGapiMock()
+
+  render(<GoogleApiProvider clientId="foo"><MyAuthComponent/></GoogleApiProvider>)
+
+  await waitFor(() => click(screen.getByRole('button', { name:/Login/i })))
+
+  user.grantsScopes(, {name: 'John Doe'})
+
+  await waitFor(() => screen.getByText(/Logged in as "John Doe"/))
+})
 ```
