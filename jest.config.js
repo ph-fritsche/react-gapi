@@ -16,8 +16,8 @@ module.exports = {
         '/_.*(?<!.test.[jt]sx?)$',
     ],
     transform: {
-        '\\.(tsx?)$': 'ts-jest',
-        '\\.(jsx?)$': 'babel-jest',
+        '\\.([tj]sx?)$': 'ts-jest',
+        // '\\.(jsx?)$': 'babel-jest',
     },
     transformIgnorePatterns: [
         '/node_modules/',

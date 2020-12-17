@@ -1,13 +1,14 @@
 {
     "compilerOptions": {
         "outDir": "dist",
+        "declaration": true,
 
         "target": "ES6",
         "lib": ["ESNext", "DOM"],
 
         "module": "esnext",
         "moduleResolution": "node",
-        
+
         "jsx": "react",
         "strict": true,
         "allowJs": true,
