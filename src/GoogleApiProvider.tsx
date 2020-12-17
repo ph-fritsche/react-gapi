@@ -1,24 +1,51 @@
 import React, { useMemo, useRef } from 'react'
-import PropTypes from 'prop-types'
 import { useLibrary } from 'react-weblibrary'
-import { GoogleApiContext } from './GoogleApiContext'
+import { GoogleApiContext, configureOptions, configure } from './GoogleApiContext'
 
-export function GoogleApiProvider({clientId, children}) {
-    const [gapi] = useLibrary('gapi', 'https://apis.google.com/js/api.js')
+type U<T> = T | undefined
 
-    const requested = useRef({modules: [], discoveryDocs: [], scopes: []}).current
-    const loading = useRef({modules: [], discoveryDocs: [], scopes: []}).current
-    const done = useRef({discoveryDocs: [], scopes: []}).current
+export function GoogleApiProvider({clientId, children}: {clientId: string, children: React.ReactNode}): React.ReactElement {
+    const [gapi] = useLibrary('gapi', 'https://apis.google.com/js/api.js') as [g: U<gapi>, s: string, t: () => void]
 
-    function configure(options, state) {
-        const {discoveryDocs = [], scopes = []} = options
-        const modules = [discoveryDocs?.length && 'client', scopes?.length && 'auth2'].filter(k => Boolean(k)).concat(options.modules ?? [])
+    const requested = useRef<requested>({modules: [], discoveryDocs: [], scopes: []}).current
+    const loading = useRef<loading>({modules: [], discoveryDocs: [], scopes: []}).current
+    const done = useRef<done>({discoveryDocs: [], scopes: []}).current
 
-        return load({discoveryDocs, scopes, modules}, state)
+    function configure(options: configureOptions, state: configureSetState): U<gapi> {
+        const modules = (options.modules ?? []).concat(
+            options.discoveryDocs?.length ? ['client'] : [],
+            options.scopes?.length ? ['auth2'] : [],
+        )
+
+        if (gapi) {
+            return doConfigure(gapi, clientId, requested, loading, done, {...options, modules}, state)
+        }
     }
 
-    function load(options, state) {
-        const { modules } = options
+    const context = useMemo<GoogleApiContext>(() => ({gapi}), [gapi])
+    context.configure = gapi ? configure : undefined
+
+    return <GoogleApiContext.Provider value={context}>{children}</GoogleApiContext.Provider>
+}
+
+interface done { discoveryDocs: string[], scopes: string[] }
+interface requested extends done { modules: string[] }
+type loading = requested
+type configureSetState = Parameters<configure>[1]
+
+function doConfigure(
+    gapi: gapi,
+    clientId: string,
+    requested: requested,
+    loading: loading,
+    done: done,
+    options: configureOptions,
+    state: configureSetState,
+): U<gapi> {
+    return load(options, state)
+
+    function load(options: configureOptions, state: configureSetState): U<gapi> {
+        const { modules = [] } = options
 
         const missingModules = modules.filter(k => !gapi[k])
 
@@ -38,8 +65,8 @@ export function GoogleApiProvider({clientId, children}) {
         }
     }
 
-    function init(options, state) {
-        const { scopes, discoveryDocs } = options
+    function init(options: configureOptions, state: configureSetState): U<gapi> {
+        const { scopes = [], discoveryDocs = [] } = options
 
         const auth = gapi.auth2?.getAuthInstance()
 
@@ -81,29 +108,40 @@ export function GoogleApiProvider({clientId, children}) {
         }
     }
 
-    function doInitScopes(options, state) {
+    function doInitScopes(options: configureOptions, state: configureSetState): void {
         const loadScopes = requested.scopes.filter(k => !loading.scopes.includes(k))
 
-        if (loadScopes.length) {
-            const auth = gapi.auth2.getAuthInstance()
-
+        if (loadScopes.length && gapi?.auth2) {
             loading.scopes.push(...loadScopes)
 
-            const f = !auth
-                ? gapi.auth2.init({
+            const auth = gapi.auth2.getAuthInstance()
+                ?? gapi.auth2.init({
                     client_id: clientId,
                     scope: loadScopes.join(' '),
                 })
-                : auth.currentUser.get().grant({
-                    scope: loadScopes.join(' '),
-                })
 
-            f.then(
-                () => init(options, state),
-                ({ error }) => console.error(`Failed to request scopes: \n${loadScopes.join('\n')}\n\nFailed with:\n${error}`),
-            ).then(() => {
-                loading.scopes = loading.scopes.filter(k => !loadScopes.includes(k))
+            if (!options.requestScopes) {
                 done.scopes.push(...loadScopes)
+                auth.then(() => init(options, state))
+                return
+            }
+
+            auth.then(() => {
+                loading.scopes = loading.scopes.filter(k => !loadScopes.includes(k))
+
+                return (auth.isSignedIn.get()
+                    ? auth.currentUser.get().grant({
+                        scope: loadScopes.join(' '),
+                    })
+                    : auth.signIn({
+                        scope: loadScopes.join(' '),
+                    }))
+            }).then(() => {
+                done.scopes.push(...loadScopes)
+                init(options, state)
+            }, ({ error }: gapiError) => {
+                done.scopes.push(...loadScopes)
+                console.error(`Failed to request scopes: \n${loadScopes.join('\n')}\n\nFailed with:\n${error}`)
             })
 
         } else {
@@ -112,10 +150,10 @@ export function GoogleApiProvider({clientId, children}) {
         }
     }
 
-    function doInitDiscoveryDocs(options, state) {
+    function doInitDiscoveryDocs(options: configureOptions, state: configureSetState): void {
         const loadDiscoveryDocs = requested.discoveryDocs.filter(k => !loading.discoveryDocs.includes(k))
 
-        if (loadDiscoveryDocs.length) {
+        if (loadDiscoveryDocs.length && gapi?.client) {
             loading.discoveryDocs.push(...loadDiscoveryDocs)
 
             gapi.client.init({
@@ -125,7 +163,7 @@ export function GoogleApiProvider({clientId, children}) {
                     done.discoveryDocs.push(...loadDiscoveryDocs)
                     init(options, state)
                 },
-                ({error}) => console.error(`Failed to load resources: \n${loadDiscoveryDocs.join('\n')}\n\nFailed with:\n${error}`),
+                ({ error }: gapiError) => console.error(`Failed to load resources: \n${loadDiscoveryDocs.join('\n')}\n\nFailed with:\n${error}`),
             ).then(() => {
                 loading.discoveryDocs = loading.discoveryDocs.filter(k => !loadDiscoveryDocs.includes(k))
             })
@@ -134,14 +172,4 @@ export function GoogleApiProvider({clientId, children}) {
             setTimeout(() => init(options, state), 100)
         }
     }
-
-    const context = useMemo(() => ({gapi}), [gapi])
-    context.configure = gapi ? configure : undefined
-
-    return <GoogleApiContext.Provider value={context}>{children}</GoogleApiContext.Provider>
-}
-
-GoogleApiProvider.propTypes = {
-    clientId: PropTypes.string.isRequired,
-    children: PropTypes.element,
 }

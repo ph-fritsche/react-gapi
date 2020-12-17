@@ -1,27 +1,21 @@
 import { waitFor } from '@testing-library/react'
 import { createGapiMock } from '../src/gapiMock'
 
-function loadAndInit(gapi, module, initConf) {
-    return new Promise((res, rej) => {
-        gapi.load(module, () => {
-            gapi[module].init(initConf).then(res, rej)
-        })
-    })
-}
-
 function loadAndInitAuth2(gapi, initConf) {
     return new Promise((res, rej) => {
-        loadAndInit(gapi, 'auth2', initConf).then(
-            auth => {
-                const signedInListener = jest.fn()
-                auth.isSignedIn.listen(signedInListener)
-                const currentUserListener = jest.fn()
-                auth.currentUser.listen(currentUserListener)
+        gapi.load('auth2', () => {
+            gapi.auth2.init(initConf).then(
+                auth => {
+                    const signedInListener = jest.fn()
+                    auth.isSignedIn.listen(signedInListener)
+                    const currentUserListener = jest.fn()
+                    auth.currentUser.listen(currentUserListener)
 
-                res({auth, signedInListener, currentUserListener})
-            },
-            rej,
-        )
+                    res({auth, signedInListener, currentUserListener})
+                },
+                rej,
+            )
+        })
     })
 }
 

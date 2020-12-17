@@ -1,8 +1,59 @@
-export function createGapiMock(setWindowProp = 'gapi') {
-    const gapi = {}
+export interface userProps {
+    id?: string,
+    email?: string,
+    name?: string,
+    givenName?: string,
+    familyName?: string,
+    imageUrl?: string,
+}
 
-    let nextInteraction
-    const _user = {
+export interface user {
+    isSignedIn: (scopes: string[], userProps: userProps) => void,
+    isNotSignedIn: (scopes: string[], userProps: userProps) => void,
+    nextInteraction: () => Promise<void>,
+    grantsScopes?: (scopes?: string[] | true, userProps?: userProps) => void,
+    deniesAccess?: () => void,
+    closesPopup?: () => void,
+}
+
+export interface userInternal {
+    isSignedIn: boolean,
+    scopes: string[],
+    props: userProps,
+    resolveNextInteraction: () => void,
+    promise?: Promise<gapi.auth2.GoogleUser>,
+}
+
+export interface registry<T> {
+    [k: string]: T,
+}
+
+export interface discoveryDocsMock {
+    (gapi: gapi): void,
+}
+
+export interface moduleMock {
+    (a: {gapi: gapi, user: user, _user: userInternal, _discoveryDocs: registry<discoveryDocsMock>}): void
+}
+
+interface registerDiscoveryDocs {
+    (o: registry<discoveryDocsMock>): void
+}
+
+interface registerModuleMocks {
+    (o: registry<moduleMock>): void
+}
+
+export function createGapiMock(setWindowProp: string | null = 'gapi')
+    : {
+        gapi: gapi,
+        user: user,
+        registerModuleMocks: registerModuleMocks,
+        registerDiscoveryDocs: registerDiscoveryDocs,
+    }
+{
+    let nextInteraction: Promise<void> | (() => void) | undefined
+    const _user: userInternal = {
         isSignedIn: false,
         scopes: [],
         props: {
@@ -22,52 +73,57 @@ export function createGapiMock(setWindowProp = 'gapi') {
             }
         },
     }
-    const user = {
-        isSignedIn: (scopes = [], userProps = {}) => {
+    const user: user = {
+        isSignedIn: (scopes = [], userProps: userProps = {}) => {
             _user.isSignedIn = true,
             _user.scopes = scopes
             _user.props = {..._user.props, ...userProps, id: userProps.id ?? _user.props.id ?? mockId() }
         },
-        isNotSignedIn: (scopes = [], userProps) => {
+        isNotSignedIn: (scopes = [], userProps: userProps) => {
             _user.isSignedIn = false,
             _user.scopes = scopes
             _user.props = { ..._user.props, ...userProps }
         },
         nextInteraction: () => {
             if (!nextInteraction) {
-                return new Promise(res => { nextInteraction = res })
+                return new Promise<void>(res => { nextInteraction = res })
             } else if (nextInteraction instanceof Promise) {
                 const p = nextInteraction
                 nextInteraction = undefined
                 return p
             }
+            throw 'user.nextInteraction() was called multiple times before an interaction happened.\n'
+                + 'This was probably not intended.'
         },
     }
 
-    const _discoveryDocs = {}
-    const registerDiscoveryDocs = o => Object.keys(o).forEach(k => _discoveryDocs[k] = o[k])
+    const _discoveryDocs: registry<discoveryDocsMock> = {}
+    const registerDiscoveryDocs: registerDiscoveryDocs = o => Object.keys(o).forEach(k => _discoveryDocs[k] = o[k])
 
-    const _createGapiModuleMocks = {
+    const _modules: registry<moduleMock> = {
         auth2: createAuthModuleMock,
         client: createClientModuleMock,
-        undefined: name => {
-            const module = {}
-            module.init = jest.fn(() => notImplemented(`Mock for gapi module "${name}"`))
+    }
+    const registerModuleMocks: registerModuleMocks = o => Object.keys(o).forEach(k => _modules[k] = o[k])
+
+    const gapi: gapi = {
+        load: (modules, then) => {
+            Promise.all(modules.split(':').map(k => new Promise<void>((res) => {
+                res()
+                if (!gapi[k]) {
+                    gapi[k] = _modules[k]
+                        ? _modules[k]({ gapi, user, _user, _discoveryDocs })
+                        : (name: string) => ({
+                            init: () => notImplemented(`Mock for gapi module "${name}"`),
+                        })
+                }
+                res()
+            }))).then(typeof then === 'function' ? then : then.callback)
         },
     }
-    const registerModuleMocks = o => Object.keys(o).forEach(k => _createGapiModuleMocks[k] = o[k])
-
-    gapi.load = jest.fn((modules, then) => {
-        Promise.all(String(modules).split(':').map(k => new Promise((res) => {
-            if (!gapi[k]) {
-                gapi[k] = _createGapiModuleMocks[k] ? _createGapiModuleMocks[k]({ gapi, user, _user, _discoveryDocs }) : _createGapiModuleMocks['undefined'](k)
-            }
-            res()
-        }))).then(() => then())
-    })
 
     if (setWindowProp) {
-        window[setWindowProp] = gapi
+        (window as unknown as {[k: string]: gapi})[setWindowProp] = gapi
     }
 
     return { gapi, user, registerModuleMocks, registerDiscoveryDocs }
@@ -77,26 +133,25 @@ function mockId() {
     return Math.random().toString(10).substr(2, 10)
 }
 
-function notImplemented(descr) {
-    throw `${descr} is not implemented yet.`
+function notImplemented(descr: string) {
+    return `${descr} is not implemented yet.`
 }
 
-function createAuthModuleMock({user, _user}) {
-    let initConfig
-    let authInstance
-    let currentUser
-    let isSignedInListeners = []
-    let currentUserListeners = []
+function createAuthModuleMock({user, _user}: {user: user, _user: userInternal}) {
+    let initConfig: gapi.auth2.ClientConfig
+    let authInstance: gapi.auth2.GoogleAuth
 
     const auth2 = {
-        init: ({ client_id, fetch_basic_profile = true, scope}) => {
+        init: (config: gapi.auth2.ClientConfig) => {
+            const {
+                client_id,
+                fetch_basic_profile = true,
+                scope = '',
+            } = config
+
             if (!client_id) {
                 throw { message: `Missing required parameter 'client_id'`}
-            }
-
-            if (fetch_basic_profile) {
-                scope = (scope ?? '') + ' openid email profile'
-            } else if (!scope) {
+            } else if (!fetch_basic_profile && !scope) {
                 throw { message: `Missing required parameter 'scope'`}
             }
 
@@ -107,79 +162,125 @@ function createAuthModuleMock({user, _user}) {
             }
 
             if (!authInstance) {
-                authInstance = createAuthInstanceMock()
-                return requestScopes((scope ?? '').split(' ').filter(k => Boolean(k)), 'auth')
-            } else {
-                return Promise.resolve(authInstance)
+                const effectiveScope = fetch_basic_profile ? scope + ' openid email profile' : scope
+                authInstance = createAuthInstanceMock(fetch_basic_profile, effectiveScope)
             }
+
+            return authInstance
         },
         getAuthInstance: () => authInstance,
-        authorize: () => notImplemented('auth2.authorize'),
-        enableDebugLogs: () => notImplemented('auth2.enableDebugLogs'),
+        authorize: () => { throw notImplemented('auth2.authorize') },
+        enableDebugLogs: () => { throw notImplemented('auth2.enableDebugLogs') },
     }
 
-    function notifyListeners(isSignedInChanged) {
-        if (isSignedInChanged) {
-            isSignedInListeners.forEach(c => c(_user.isSignedIn))
-        }
-        currentUserListeners.forEach(c => c(currentUser))
-    }
+    function createAuthInstanceMock(fetch_basic_profile: boolean, initScope: string): gapi.auth2.GoogleAuth {
+        let currentUser: gapi.auth2.GoogleUser | undefined
 
-    function requestScopes(scopes = [], authOrUser = 'user', prompt) {
-        if (_user.promise) {
-            throw 'The behavior when a previous Promise is still pending is unknown - call user.grantsScopes() or user.closesPopup()'
-        }
-        return _user.promise = new Promise((res, rej) => {
-            function clearInteraction() {
-                delete user.grantsScopes
-                delete user.closesPopup
-                Promise.resolve().then(() => { delete _user.promise })
-            }
+        const isSignedInListeners: ((v: boolean) => void)[] = []
+        const currentUserListeners: ((v: ReturnType<typeof createCurrentUserMock>) => void)[] = []
 
-            user.grantsScopes = (grantedScopes = true, userProps = {}) => {
-                const isSignedInChanged = !_user.isSignedIn
-                _user.isSignedIn = true
+        const auth = {
+            then: (onInit: (a: gapi.auth2.GoogleAuth) => void, onFailure: (a: gapiError) => void) => {
+                Promise.resolve().then(() => onInit(auth), (r) => onFailure(r))
+            },
+            signIn: ({scope = '', prompt = undefined}: gapi.auth2.SigninOptions = {}): Promise<gapi.auth2.GoogleUser> => {
+                const scopeArray = (initScope ?? '' + ' ' + scope).split(' ').filter(k => Boolean(k))
+                return requestScopes(scopeArray, prompt)
+            },
+            signOut: () => new Promise<gapi.auth2.GoogleUser>(res => {
+                const isSignedInChanged = _user.isSignedIn
 
-                if (grantedScopes === true) {
-                    grantedScopes = scopes
-                }
-                // openid is always added
-                grantedScopes.push('openid')
-                grantedScopes.forEach(k => {
-                    if (!_user.scopes.includes(k)) {
-                        _user.scopes.push(k)
-                    }
-
-                    // the module adds these scopes automatically
-                    if (k === 'profile' && !_user.scopes.includes('https://www.googleapis.com/auth/userinfo.profile')) {
-                        _user.scopes.push('https://www.googleapis.com/auth/userinfo.profile')
-                    } else if (k === 'email' && !_user.scopes.includes('https://www.googleapis.com/auth/userinfo.email')) {
-                        _user.scopes.push('https://www.googleapis.com/auth/userinfo.email')
-                    }
-                })
-
-                _user.props = { ..._user.props, ...userProps, id: userProps?.id ?? _user.props.id ?? mockId() }
-
+                _user.isSignedIn = false
                 currentUser = createCurrentUserMock()
 
+                res(currentUser)
+
                 notifyListeners(isSignedInChanged)
+            }),
+            disconnect: () => new Promise<void>(res => {
+                _user.scopes = []
+                auth.signOut().then(() => res())
+            }),
+            currentUser: {
+                // currentUser.get() can return undefined on newly initialized GoogleAuth
+                get: () => (currentUser as gapi.auth2.GoogleUser),
+                listen: (c: (newCurrentUser: gapi.auth2.GoogleUser) => void) => { currentUserListeners.push(c) },
+            },
+            isSignedIn: {
+                get: () => _user.isSignedIn,
+                listen: (c: (newIsSignedIn: boolean) => void) => { isSignedInListeners.push(c) },
+            },
+            grantOfflineAccess: () => { throw notImplemented('GoogleAuth.grantOfflineAccess') },
+            attachClickHandler: () => { throw notImplemented('GoogleAuth.attachClickHandler') },
+        }
 
-                clearInteraction()
-                res(authOrUser === 'auth' ? authInstance : currentUser)
-            }
-            user.deniesAccess = () => {
-                clearInteraction()
-                rej({error: 'access_denied'})
-            }
-            user.closesPopup = () => {
-                clearInteraction()
-                rej({error: 'popup_closed_by_user'})
-            }
+        if (_user.isSignedIn) {
+            currentUser = createCurrentUserMock()
+        }
 
-            if (authOrUser === 'user') {
+        return auth
+
+        function notifyListeners(isSignedInChanged: boolean) {
+            if (isSignedInChanged) {
+                isSignedInListeners.forEach(c => c(_user.isSignedIn))
+            }
+            currentUserListeners.forEach(c => currentUser && c(currentUser))
+        }
+
+        function requestScopes(scopes: string[], prompt?: string): Promise<gapi.auth2.GoogleUser> {
+            if (_user.promise) {
+                throw 'The behavior when a previous Promise is still pending is unknown - call user.grantsScopes() or user.closesPopup()'
+            }
+            return _user.promise = new Promise((res, rej) => {
+                function clearInteraction() {
+                    delete user.grantsScopes
+                    delete user.closesPopup
+                    Promise.resolve().then(() => { delete _user.promise })
+                }
+
+                user.grantsScopes = (grantedScopes = true, userProps = {}) => {
+                    const isSignedInChanged = !_user.isSignedIn
+                    _user.isSignedIn = true
+
+                    if (grantedScopes === true) {
+                        grantedScopes = scopes
+                    }
+                    // openid is always added
+                    grantedScopes.push('openid')
+                    grantedScopes.forEach(k => {
+                        if (!_user.scopes.includes(k)) {
+                            _user.scopes.push(k)
+                        }
+
+                        // the module adds these scopes automatically
+                        if (k === 'profile' && !_user.scopes.includes('https://www.googleapis.com/auth/userinfo.profile')) {
+                            _user.scopes.push('https://www.googleapis.com/auth/userinfo.profile')
+                        } else if (k === 'email' && !_user.scopes.includes('https://www.googleapis.com/auth/userinfo.email')) {
+                            _user.scopes.push('https://www.googleapis.com/auth/userinfo.email')
+                        }
+                    })
+
+                    _user.props = { ..._user.props, ...userProps, id: userProps?.id ?? _user.props.id ?? mockId() }
+
+                    currentUser = createCurrentUserMock()
+
+                    clearInteraction()
+                    res(currentUser)
+
+                    notifyListeners(isSignedInChanged)
+                }
+                user.deniesAccess = () => {
+                    clearInteraction()
+                    rej({ error: 'access_denied' })
+                }
+                user.closesPopup = () => {
+                    clearInteraction()
+                    rej({ error: 'popup_closed_by_user' })
+                }
+
                 if (scopes.every(k => _user.scopes.includes(k))) {
                     // if a user granted scopes before, the popup closes automatically
-                    if (_user.loggedIn && !['consent', 'select_account'].includes(prompt)) {
+                    if (_user.isSignedIn && prompt && !['consent', 'select_account'].includes(prompt)) {
                         user.grantsScopes()
                     }
                 } else if (prompt === 'none') {
@@ -187,116 +288,83 @@ function createAuthModuleMock({user, _user}) {
                 }
 
                 _user.resolveNextInteraction()
-            } else if (authOrUser === 'auth') {
-                if (_user.isSignedIn) {
-                    currentUser = createCurrentUserMock()
-                    notifyListeners(true)
-                }
-
-                clearInteraction()
-                res(authInstance)
-            }
-        })
-    }
-
-    function createAuthInstanceMock() {
-        return {
-            signIn: ({scope = '', prompt} = {}) => requestScopes((initConfig.scope + ' ' + scope).split(' ').filter(k => Boolean(k)), 'user', prompt),
-            signOut: () => new Promise(res => {
-                const isSignedInChanged = _user.isSignedIn
-
-                _user.isSignedIn = false
-                currentUser = createCurrentUserMock()
-
-                notifyListeners(isSignedInChanged)
-
-                res(auth2.getAuthInstance().currentUser.get())
-            }),
-            disconnect: () => new Promise(res => {
-                _user.scopes = []
-                authInstance.signOut.then(r => res(r))
-            }),
-            currentUser: {
-                get: () => currentUser,
-                listen: (c) => { currentUserListeners.push(c) },
-            },
-            isSignedIn: {
-                get: () => _user.isSignedIn,
-                listen: (c) => { isSignedInListeners.push(c) },
-            },
-            grantOfflineAccess: () => notImplemented('GoogleAuth.grantOfflineAccess'),
-            attachClickHandler: () => notImplemented('GoogleAuth.attachClickHandler'),
+            })
         }
-    }
 
-    function createCurrentUserMock() {
-        const basicProfile = createBasicProfileMock()
+        function createCurrentUserMock(): gapi.auth2.GoogleUser {
+            const basicProfile = createBasicProfileMock()
 
-        return {
-            getId: () => _user.props.id,
-            isSignedIn: () => _user.isSignedIn,
-            getHostedDomain: () => notImplemented('GoogleUser.getHostedDomain'),
-            getGrantedScopes: () => _user.isSignedIn
-                // when fetch_basic_profile is true, the user can not login without consenting to these scopes
-                ? _user.scopes.concat(initConfig.fetch_basic_profile ? ['email', 'openid', 'profile'] : []).join(' ')
-                : '',
-            getBasicProfile: () => basicProfile,
-            getAuthResponse: () => notImplemented('GoogleUser.getAuthResponse'),
-            reloadAuthResponse: () => notImplemented('GoogleUser.reloadAuthResponse'),
-            hasGrantedScopes: scope => String(scope).split(' ').filter(k => Boolean(k) && !_user.scopes.includes(k)).length > 0,
-            grant: (options) => authInstance.signIn(options),
-            grantOfflineAccess: () => notImplemented('GoogleUser.grantOfflineAccess'),
-            disconnect: () => authInstance.disconnect(),
+            return {
+                getId: () => _user.props.id ?? '',
+                signIn: (options: gapi.auth2.SigninOptions) => authInstance?.signIn(options),
+                isSignedIn: () => _user.isSignedIn,
+                getHostedDomain: () => { throw notImplemented('GoogleUser.getHostedDomain') },
+                getGrantedScopes: () => _user.isSignedIn
+                    // when fetch_basic_profile is true, the user can not login without consenting to these scopes
+                    ? _user.scopes.concat(fetch_basic_profile ? ['email', 'openid', 'profile'] : []).join(' ')
+                    : '',
+                getBasicProfile: () => basicProfile,
+                getAuthResponse: () => { throw notImplemented('GoogleUser.getHostedDomain') },
+                reloadAuthResponse: () => { throw notImplemented('GoogleUser.getHostedDomain') },
+                hasGrantedScopes: (scope: string) => scope.split(' ').filter(k => Boolean(k) && !_user.scopes.includes(k)).length > 0,
+                grant: (options: { scope?: string, prompt?: string } = {}) => authInstance && authInstance.signIn(options),
+                grantOfflineAccess: () => { throw notImplemented('GoogleUser.getHostedDomain') },
+                disconnect: () => authInstance && authInstance.disconnect(),
+            }
+
+            function createBasicProfileMock(): gapi.auth2.BasicProfile {
+                return initConfig?.fetch_basic_profile
+                    ? {
+                        getId: () => _user.props.id ?? '',
+                        getName: () => _user.props.name ?? '',
+                        getGivenName: () => _user.props.givenName ?? '',
+                        getFamilyName: () => _user.props.familyName ?? '',
+                        getImageUrl: () => _user.props.imageUrl ?? '',
+                        getEmail: () => _user.props.email ?? '',
+                    }
+                    : {
+                        getId: () => _user.props.id ?? '',
+                        getName: () => '',
+                        getGivenName: () => '',
+                        getFamilyName: () => '',
+                        getImageUrl: () => '',
+                        getEmail: () => '',
+                    }
+            }
         }
-    }
-
-    function createBasicProfileMock() {
-        return initConfig.fetch_basic_profile
-            ? {
-                getId: () => _user.props.id,
-                getName: () => _user.props.name ?? '',
-                getGivenName: () => _user.props.givenName ?? '',
-                getFamilyName: () => _user.props.familyName ?? '',
-                getImageUrl: () => _user.props.imageUrl ?? '',
-                getEmail: () => _user.props.email ?? '',
-            }
-            : {
-                getId: () => _user.props.id,
-                getName: () => '',
-                getGivenName: () => '',
-                getFamilyName: () => '',
-                getImageUrl: () => '',
-                getEmail: () => '',
-            }
     }
 
     return auth2
 }
 
-function createClientModuleMock({gapi, _discoveryDocs}) {
-    const client = {}
+function createClientModuleMock({gapi, _discoveryDocs}: {gapi: gapi, _discoveryDocs: registry<discoveryDocsMock>}) {
+    const client: gapi.client = {
+        init: ({clientId = undefined, scope = undefined, discoveryDocs = []}: gapi.client.ClientConfig) => new Promise<void>((res, rej) => {
+            const p = []
 
-    client.init = ({client_id, scope, discoveryDocs = []}) => {
-        const p = []
-
-        if (scope) {
-            p.push(gapi.auth2.init({client_id, scope}))
-        }
-
-        p.push(...discoveryDocs.map(k => new Promise((res, rej) => {
-            try {
-                if (typeof(_discoveryDocs[k]) === 'function') {
-                    _discoveryDocs[k](gapi)
+            if (scope) {
+                if (gapi.auth2) {
+                    p.push(gapi.auth2.init({client_id: clientId, scope}))
                 } else {
-                    throw `Tried to load discoveryDocs ${k} - use registerDiscoveryDocs to mock discoveryDocs`
+                    throw 'gapi.auth2 not loaded'
                 }
-                res()
-            } catch(e) {
-                rej(e)
             }
-        })))
 
-        return Promise.all(p)
+            p.push(...discoveryDocs.map(k => new Promise<void>((res, rej) => {
+                try {
+                    if (typeof(_discoveryDocs[k]) === 'function') {
+                        _discoveryDocs[k](gapi)
+                    } else {
+                        throw `Tried to load discoveryDocs ${k} - use registerDiscoveryDocs to mock discoveryDocs`
+                    }
+                    res()
+                } catch(e) {
+                    rej(e)
+                }
+            })))
+
+            Promise.all<unknown>(p).then(() => res(), () => rej())
+        }),
     }
 
     return client
