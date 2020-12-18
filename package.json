@@ -6,6 +6,9 @@
         "API",
         "googleapis"
     ],
+    "repository": "https://github.com/ph-fritsche/react-gapi.git",
+    "author": "Philipp Fritsche",
+    "license": "MIT",
     "main": "dist/index.js",
     "files": [
         "dist/"
