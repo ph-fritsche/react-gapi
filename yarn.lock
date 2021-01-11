@@ -540,6 +540,13 @@
     eslint-plugin-react-hooks "^4"
     eslint-plugin-testing-library "^3"
 
+"@ph.fritsche/scripts-config@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@ph.fritsche/scripts-config/-/scripts-config-1.0.0.tgz#6dc9939eb432f110148967a26f78e88f8c9a7e09"
+  integrity sha512-LkLtSd0/s2K+nXYOv8JevnagxZf5ND3iOpAuEFuz2zEbMXRyD17e2ev8gEZbJrCt53NzJ5lnKdKAPdy/S486TA==
+  dependencies:
+    cross-spawn "^7.0.3"
+
 "@sinonjs/commons@^1.7.0":
   version "1.8.1"
   resolved "https://registry.yarnpkg.com/@sinonjs/commons/-/commons-1.8.1.tgz#e7df00f98a203324f6dc7cc606cad9d4a8ab2217"
@@ -1413,7 +1420,7 @@ cross-spawn@^6.0.0:
     shebang-command "^1.2.0"
     which "^1.2.9"
 
-cross-spawn@^7.0.0, cross-spawn@^7.0.2:
+cross-spawn@^7.0.0, cross-spawn@^7.0.2, cross-spawn@^7.0.3:
   version "7.0.3"
   resolved "https://registry.yarnpkg.com/cross-spawn/-/cross-spawn-7.0.3.tgz#f73a85b9d5d41d045551c177e2882d4ac85728a6"
   integrity sha512-iRDPJKUPVEND7dHPO8rkbOnPpyDygcDFtWjpeWNCgy8WP2rXcxXL8TskReQl6OrB2G7+UJrags1q15Fudc7G6w==
@@ -4108,6 +4115,11 @@ set-value@^2.0.0, set-value@^2.0.1:
     is-extendable "^0.1.1"
     is-plain-object "^2.0.3"
     split-string "^3.0.1"
+
+shared-scripts@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/shared-scripts/-/shared-scripts-1.0.0.tgz#bc01df6e1dd17f68aaaf0b46424b4603c3a4d6de"
+  integrity sha512-LBOxUWuE6mpyNM0Qn7HzdcC9yV06smsI6pMu6Cm4dqf4MLfCjAWzEW4Wr6l4EmHLHnaceb7wFcl8/NSn1VJ3Xg==
 
 shebang-command@^1.2.0:
   version "1.2.0"
