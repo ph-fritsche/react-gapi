@@ -10,6 +10,9 @@
     "author": "Philipp Fritsche",
     "license": "MIT",
     "main": "dist/index.js",
+    "exports": {
+        "./testing": "./dist/testing.js"
+    },
     "files": [
         "dist/"
     ],

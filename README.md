@@ -67,12 +67,13 @@ export function MyDriveComponent() {
 
 ```js
 // src/MyAuthComponent.test.js
-import React from 'react';
-import { MyAuthComponent } from './MyAuthComponent';
-import { act, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import '@testing-library/jest-dom';
-import { GoogleApiProvider, createGapiMock } from 'react-gapi';
+import React from 'react'
+import { MyAuthComponent } from './MyAuthComponent'
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import '@testing-library/jest-dom'
+import { GoogleApiProvider } from 'react-gapi'
+import { createGapiMock } from 'react-gapi/testing'
 
 it('Sign in', async () => {
     const { user } = createGapiMock();
