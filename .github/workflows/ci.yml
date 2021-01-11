@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: bahmutov/npm-install@v1
+    - run: yarn lint
+    - run: yarn test
+    - uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage/lcov.info
+
+  release:
+    if: github.event_name == 'push'
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: bahmutov/npm-install@v1
+    - run: yarn build
+    - uses: ph-fritsche/action-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
