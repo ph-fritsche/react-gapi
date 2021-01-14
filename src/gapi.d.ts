@@ -1,11 +1,11 @@
-interface gapi {
+export interface gapiObject {
     load: typeof gapi.load,
-    client?: gapi.client,
-    auth2?: gapi.auth2,
+    client?: gapiObject.client,
+    auth2?: gapiObject.auth2,
     [k: string]: unknown,
 }
 
-declare namespace gapi {
+declare namespace gapiObject {
     interface client {
         init: typeof gapi.client.init,
         [k: string]: unknown,

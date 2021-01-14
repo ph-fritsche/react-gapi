@@ -642,6 +642,11 @@
   dependencies:
     "@types/gapi" "*"
 
+"@types/gapi.client@^1.0.3":
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/@types/gapi.client/-/gapi.client-1.0.3.tgz#6e61f4bd210440208c1ca8a64d1d1a0263e8f9ff"
+  integrity sha512-XhJ45zhedkqXln75Y0XZAFmHFHNu6zCGe9EyPiu5a20Q7XnsEENR3dnUqbYvp7w9e6vjXW+uKGqb3z/ezZijDg==
+
 "@types/gapi@*", "@types/gapi@^0.0.39":
   version "0.0.39"
   resolved "https://registry.yarnpkg.com/@types/gapi/-/gapi-0.0.39.tgz#bc7fa8cd0cb175b36e3609790fb2ed73a33f6881"

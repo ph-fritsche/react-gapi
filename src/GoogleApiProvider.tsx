@@ -1,17 +1,18 @@
 import React, { useMemo, useRef } from 'react'
 import { useLibrary } from 'react-weblibrary'
+import { gapiError, gapiObject } from './gapi'
 import { GoogleApiContext, configureOptions, configure } from './GoogleApiContext'
 
 type U<T> = T | undefined
 
 export function GoogleApiProvider({clientId, children}: {clientId: string, children: React.ReactNode}): React.ReactElement {
-    const [gapi] = useLibrary('gapi', 'https://apis.google.com/js/api.js') as [g: U<gapi>, s: string, t: () => void]
+    const [gapi] = useLibrary('gapi', 'https://apis.google.com/js/api.js') as [g: U<gapiObject>, s: string, t: () => void]
 
     const requested = useRef<requested>({modules: [], discoveryDocs: [], scopes: []}).current
     const loading = useRef<loading>({modules: [], discoveryDocs: [], scopes: []}).current
     const done = useRef<done>({discoveryDocs: [], scopes: []}).current
 
-    function configure(options: configureOptions, state: configureSetState): U<gapi> {
+    function configure(options: configureOptions, state: configureSetState): U<gapiObject> {
         const modules = (options.modules ?? []).concat(
             options.discoveryDocs?.length ? ['client'] : [],
             options.scopes?.length ? ['auth2'] : [],
@@ -34,17 +35,17 @@ type loading = requested
 type configureSetState = Parameters<configure>[1]
 
 function doConfigure(
-    gapi: gapi,
+    gapi: gapiObject,
     clientId: string,
     requested: requested,
     loading: loading,
     done: done,
     options: configureOptions,
     state: configureSetState,
-): U<gapi> {
+): U<gapiObject> {
     return load(options, state)
 
-    function load(options: configureOptions, state: configureSetState): U<gapi> {
+    function load(options: configureOptions, state: configureSetState): U<gapiObject> {
         const { modules = [] } = options
 
         const missingModules = modules.filter(k => !gapi[k])
@@ -65,7 +66,7 @@ function doConfigure(
         }
     }
 
-    function init(options: configureOptions, state: configureSetState): U<gapi> {
+    function init(options: configureOptions, state: configureSetState): U<gapiObject> {
         const { scopes = [], discoveryDocs = [] } = options
 
         const auth = gapi.auth2?.getAuthInstance()

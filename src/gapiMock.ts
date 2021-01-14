@@ -1,3 +1,5 @@
+import { gapiError, gapiObject } from './gapi'
+
 export interface userProps {
     id?: string,
     email?: string,
@@ -29,11 +31,11 @@ export interface registry<T> {
 }
 
 export interface discoveryDocsMock {
-    (gapi: gapi): void,
+    (gapi: gapiObject): void,
 }
 
 export interface moduleMock {
-    (a: {gapi: gapi, user: user, _user: userInternal, _discoveryDocs: registry<discoveryDocsMock>}): void
+    (a: {gapi: gapiObject, user: user, _user: userInternal, _discoveryDocs: registry<discoveryDocsMock>}): void
 }
 
 interface registerDiscoveryDocs {
@@ -46,7 +48,7 @@ interface registerModuleMocks {
 
 export function createGapiMock(setWindowProp: string | null = 'gapi')
     : {
-        gapi: gapi,
+        gapi: gapiObject,
         user: user,
         registerModuleMocks: registerModuleMocks,
         registerDiscoveryDocs: registerDiscoveryDocs,
@@ -106,8 +108,8 @@ export function createGapiMock(setWindowProp: string | null = 'gapi')
     }
     const registerModuleMocks: registerModuleMocks = o => Object.keys(o).forEach(k => _modules[k] = o[k])
 
-    const gapi: gapi = {
-        load: (modules, then) => {
+    const gapi: gapiObject = {
+        load: (modules: string, then: gapi.CallbackOrConfig) => {
             Promise.all(modules.split(':').map(k => new Promise<void>((res) => {
                 res()
                 if (!gapi[k]) {
@@ -123,7 +125,7 @@ export function createGapiMock(setWindowProp: string | null = 'gapi')
     }
 
     if (setWindowProp) {
-        (window as unknown as {[k: string]: gapi})[setWindowProp] = gapi
+        (window as unknown as {[k: string]: gapiObject})[setWindowProp] = gapi
     }
 
     return { gapi, user, registerModuleMocks, registerDiscoveryDocs }
@@ -337,9 +339,9 @@ function createAuthModuleMock({user, _user}: {user: user, _user: userInternal}) 
     return auth2
 }
 
-function createClientModuleMock({gapi, _discoveryDocs}: {gapi: gapi, _discoveryDocs: registry<discoveryDocsMock>}) {
-    const client: gapi.client = {
-        init: ({clientId = undefined, scope = undefined, discoveryDocs = []}: gapi.client.ClientConfig) => new Promise<void>((res, rej) => {
+function createClientModuleMock({gapi, _discoveryDocs}: {gapi: gapiObject, _discoveryDocs: registry<discoveryDocsMock>}) {
+    const client: gapiObject.client = {
+        init: ({clientId = undefined, scope = undefined, discoveryDocs = []}: gapiObject.client.ClientConfig) => new Promise<void>((res, rej) => {
             const p = []
 
             if (scope) {
