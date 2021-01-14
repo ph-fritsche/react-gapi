@@ -1,4 +1,4 @@
-import { gapiError, gapiObject } from './gapi'
+import { ClientConfig, gapiError, gapiObject } from './gapi'
 
 export interface userProps {
     id?: string,
@@ -340,8 +340,8 @@ function createAuthModuleMock({user, _user}: {user: user, _user: userInternal}) 
 }
 
 function createClientModuleMock({gapi, _discoveryDocs}: {gapi: gapiObject, _discoveryDocs: registry<discoveryDocsMock>}) {
-    const client: gapiObject.client = {
-        init: ({clientId = undefined, scope = undefined, discoveryDocs = []}: gapiObject.client.ClientConfig) => new Promise<void>((res, rej) => {
+    const client: gapiObject['client'] = {
+        init: ({clientId = undefined, scope = undefined, discoveryDocs = []}: ClientConfig) => new Promise<void>((res, rej) => {
             const p = []
 
             if (scope) {
