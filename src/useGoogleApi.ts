@@ -1,8 +1,8 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { gapiObject } from './gapi'
-import { GoogleApiContext } from './GoogleApiContext'
+import { configureOptions, GoogleApiContext } from './GoogleApiContext'
 
-export function useGoogleApi({discoveryDocs = [], scopes = [], modules = []} = {}): gapiObject | undefined {
+export function useGoogleApi(options: configureOptions = {}): gapiObject | undefined {
     const { gapi, configure } = useContext(GoogleApiContext) ?? {}
 
     const [configureState, setConfigureState] = useState<string>()
@@ -22,5 +22,10 @@ export function useGoogleApi({discoveryDocs = [], scopes = [], modules = []} = {
         }
     }, [auth])
 
-    return configure ? configure({discoveryDocs, scopes, modules}, newState => mounted.current && newState !== configureState && setConfigureState(newState)) : undefined
+    return configure
+        ? configure(
+            options,
+            newState => mounted.current && newState !== configureState && setConfigureState(newState),
+        )
+        : undefined
 }
