@@ -7,7 +7,7 @@ export function useGoogleApi(options: configureOptions = {}): gapiObject | undef
 
     const [configureState, setConfigureState] = useState<string>()
 
-    const mounted = useRef<boolean>()
+    const mounted = useRef<boolean>(true)
     useEffect(() => {
         mounted.current = true
         return () => { mounted.current = false}
