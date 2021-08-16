@@ -298,7 +298,6 @@ function createAuthModuleMock({user, _user}: {user: user, _user: userInternal}) 
 
             return {
                 getId: () => _user.props.id ?? '',
-                signIn: (options: gapi.auth2.SigninOptions) => authInstance?.signIn(options),
                 isSignedIn: () => _user.isSignedIn,
                 getHostedDomain: () => { throw notImplemented('GoogleUser.getHostedDomain') },
                 getGrantedScopes: () => _user.isSignedIn

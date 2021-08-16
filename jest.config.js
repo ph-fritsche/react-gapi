@@ -5,6 +5,7 @@ module.exports = {
         'src/**/*.{js,jsx,ts,tsx}',
     ],
     coveragePathIgnorePatterns: [],
+    testEnvironment: 'jsdom',
     testEnvironmentOptions: {
         resources: 'usable',
         runScripts: 'dangerously',
@@ -17,7 +18,6 @@ module.exports = {
     ],
     transform: {
         '\\.([tj]sx?)$': 'ts-jest',
-        // '\\.(jsx?)$': 'babel-jest',
     },
     transformIgnorePatterns: [
         '/node_modules/',
