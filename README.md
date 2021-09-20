@@ -68,31 +68,28 @@ export function MyDriveComponent() {
 ```js
 // src/MyAuthComponent.test.js
 import React from 'react'
-import { MyAuthComponent } from './MyAuthComponent'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
+import { MyAuthComponent } from './MyAuthComponent'
 import { GoogleApiProvider } from 'react-gapi'
 import { createGapiMock } from 'react-gapi/testing'
 
 it('Sign in', async () => {
-    const { user } = createGapiMock();
+    const { user } = createGapiMock()
 
     render(
-        <GoogleApiProvider clientId="foo">
+        <GoogleApiProvider clientId="foo" >
             <MyAuthComponent />
         </GoogleApiProvider>,
-    );
+    )
 
-    const loginButton = await screen.findByRole('button', { name: /login/i });
-    userEvent.click(loginButton);
+    userEvent.click(await screen.findByRole('button', { name: /login/i }))
 
-    await act(async () => {
-        user.grantsScopes(true, { name: 'John Doe' });
+    act(() => {
+        user.grantsScopes?.(true, { name: 'John Doe' })
+    })
 
-        await screen.findByText(/Logged in as /);
-    });
-
-    expect(screen.getByText(/Logged in as /)).toHaveTextContent('"John Doe"');
-});
+    expect(await screen.findByText(/Logged in as /)).toHaveTextContent('"John Doe"')
+})
 ```
