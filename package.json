@@ -19,6 +19,7 @@
             "import": "./dist/esm/index.js",
             "default": "./dist/cjs/index.js"
         },
+        "./dist/*": "./dist/*.js",
         "./testing": {
             "node": "./dist/cjs/testing.js",
             "import": "./dist/esm/testing.js",
@@ -27,11 +28,17 @@
     },
     "typesVersions": {
         "*": {
-            "dist/types/index.d.ts": [
-                "./dist/types/index.d.ts"
+            "dist/types/*": [
+                "./dist/types/*"
+            ],
+            "dist/cjs/*": [
+                "./dist/types/*.d.ts"
+            ],
+            "dist/esm/*": [
+                "./dist/types/*.d.ts"
             ],
             "*": [
-                "dist/types/*.d.ts"
+                "./dist/types/*.d.ts"
             ]
         }
     },
